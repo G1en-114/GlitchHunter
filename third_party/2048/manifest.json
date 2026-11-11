@@ -1,0 +1,21 @@
+{
+  "buildId": "41e4d4a093e2968ac9b40286749d0239ed343462c8b50f26d96b3469097d7315",
+  "files": {
+    "LICENSE.txt": "961412875d4af6f01be337b8df99fb67a04586c4f48c13349b232f66f59e5f65",
+    "PROVENANCE.md": "4b44ae2d647908461831e2a9185b22ce3813259d100d03329fd1b721c4a21cdb",
+    "README.md": "184373338f8d661292fd09ae0a6ff7c6ab4a799674998d40045efb899540f810",
+    "index.html": "d9c4107b2c5d7be49feded8949ddf4063c578fcb97dd9eb3e83291f99029354f",
+    "js/animframe_polyfill.js": "5b540d4499a0f54b412025d8c855db99bb4f01b2a4152a43bf1d560734f9dac9",
+    "js/application.js": "2a8f8a3ca3704fd994e6fa38d1cf3221b44f5611d732b7e78207717d60d91ec5",
+    "js/bind_polyfill.js": "5d1be6bb1849353cd9f88644ce65f493c21d5990d7ab5dd73f692e5635272d89",
+    "js/classlist_polyfill.js": "2834e44eefdd641bcf6fb546b37e00fd80c57c63f99b5ed1a163bf9b0a38afcd",
+    "js/game_manager.js": "3d96ff48654d4793e1b0ad6d54d79252778e9489cf7c6a1836de20a30c9ace6c",
+    "js/grid.js": "a220835942143bbd1482bb732aae838d65654689de938ff41dc39e6fc1e3a4f1",
+    "js/html_actuator.js": "2ea34bcc66d96acee4d7b6b9b0c1eecc903a835b1091faca0219bc516a3c917d",
+    "js/keyboard_input_manager.js": "32cdf25010e429ba08db5732353cdd24d05fdba2c2337ebd03102e6b3298d448",
+    "js/local_storage_manager.js": "448e31f9f64b30c178ecd0f107a6d7e2a4d0d5826344672a961d90b1b6cd084c",
+    "js/tile.js": "201a7f35cee0d7eb608b80a1aa42ffa9643e236768ed31e3f7312a6bfe73719e",
+    "style/fonts/clear-sans.css": "d0d75611a7b9fa99e5fc58573012b548998afe44fa3e917b45eb7c15704bd9db",
+    "style/main.css": "a05211f498ccefabf069e47779c59275386c8d3d1fa3f35a8db9ad195e3021a0"
+  }
+}

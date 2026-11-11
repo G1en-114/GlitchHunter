@@ -1,0 +1,3 @@
+* text=auto eol=lf
+# Preserve vendored fixture bytes and their recorded build fingerprint.
+third_party/** -text -whitespace

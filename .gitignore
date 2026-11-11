@@ -1,0 +1,12 @@
+node_modules/
+runs/
+.env
+.env.*
+!.env.example
+.dsh/
+.runtime/
+*.log
+.DS_Store
+.agents/
+.aws/
+.codex/

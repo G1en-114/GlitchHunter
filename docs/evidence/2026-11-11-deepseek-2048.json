@@ -1,0 +1,81 @@
+{
+  "date": "2026-11-11",
+  "purpose": "single-agent screenshot-input-replay smoke test; not a bug-finding benchmark",
+  "environment": {
+    "node": "26.13.0",
+    "playwright": "1.65.0",
+    "harness": "0.2.1-rc.5",
+    "browser": "156.0.8078.79"
+  },
+  "game": {
+    "id": "2048-upstream-local",
+    "buildId": "41e4d4a093e2968ac9b40286749d0239ed343462c8b50f26d96b3469097d7315",
+    "seed": 42,
+    "seededHarness": true,
+    "hz": 60,
+    "screenshotAnimations": "disabled"
+  },
+  "agent": {
+    "provider": "deepseek-account",
+    "model": "deepseek-flash",
+    "reasoningEffort": "high",
+    "observationMode": "screenshot-only",
+    "inputMode": "tap-macro"
+  },
+  "decisions": [
+    {
+      "index": 1,
+      "key": "ArrowLeft",
+      "durationMs": 3177,
+      "imageReadCompleted": true
+    },
+    {
+      "index": 2,
+      "key": "ArrowDown",
+      "durationMs": 5820,
+      "imageReadCompleted": true
+    },
+    {
+      "index": 3,
+      "key": "ArrowRight",
+      "durationMs": 9060,
+      "imageReadCompleted": true
+    },
+    {
+      "index": 4,
+      "key": "ArrowDown",
+      "durationMs": 9009,
+      "imageReadCompleted": true
+    },
+    {
+      "index": 5,
+      "key": "ArrowRight",
+      "durationMs": 4925,
+      "imageReadCompleted": true
+    },
+    {
+      "index": 6,
+      "key": "ArrowLeft",
+      "durationMs": 5763,
+      "imageReadCompleted": true
+    }
+  ],
+  "summary": {
+    "steps": 12,
+    "ticks": 108,
+    "reason": "step-budget",
+    "findings": [],
+    "policyLabel": "deepseek-harness-screenshot-player"
+  },
+  "lastObservedScore": 20,
+  "replay": {
+    "verified": true,
+    "steps": 12,
+    "reason": "all-inspected-checkpoints-match"
+  },
+  "automatedTests": {
+    "passed": 8,
+    "failed": 0,
+    "modelCallsRequired": false
+  }
+}
