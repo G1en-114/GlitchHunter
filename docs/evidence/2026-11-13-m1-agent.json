@@ -1,0 +1,116 @@
+{
+  "date": "2026-11-13",
+  "purpose": "M1 bounded single-agent gameplay validation; two seeds are not a statistical performance benchmark",
+  "protocol": {
+    "observationMode": "screenshot-and-public-hud",
+    "inputMode": "compiled-player-actions",
+    "task": "2048-tile-16",
+    "gameBuildId": "41e4d4a093e2968ac9b40286749d0239ed343462c8b50f26d96b3469097d7315",
+    "targetTile": 16,
+    "budgets": {
+      "actionsPerSeed": 8,
+      "modelCallsPerSeed": 10,
+      "wallTimeMsPerSeed": 120000,
+      "maxAttemptsPerDecision": 2
+    },
+    "callUnit": "harness-invocation",
+    "callCountNote": "modelCalls counts Harness decision attempts including retries, not underlying provider API requests or token usage"
+  },
+  "model": {
+    "provider": "deepseek-account",
+    "model": "deepseek-flash",
+    "reasoningEffort": "high",
+    "harnessVersion": "0.2.1-rc.5"
+  },
+  "earlierFailure": {
+    "seed": 42,
+    "status": "error",
+    "reason": "execution-error",
+    "goal": "2048-tile-16",
+    "outcome": {
+      "status": "running",
+      "metrics": {
+        "maxTile": 4,
+        "score": 12
+      }
+    },
+    "actions": 6,
+    "atomicInputs": 12,
+    "modelCalls": 8,
+    "retries": 1,
+    "failedAttempts": 2,
+    "visibleChangedActions": 6,
+    "noProgressActions": 0,
+    "durationMs": 67446,
+    "replay": {
+      "verified": true,
+      "steps": 12,
+      "reason": "all-inspected-checkpoints-match"
+    },
+    "error": {
+      "code": "MODEL_ATTEMPTS_EXHAUSTED",
+      "message": "Model decision failed after 2 attempts: Unexpected non-whitespace character after JSON at position 138 (line 1 column 139)"
+    },
+    "change": "A failed JSON attempt now retries a minimal action-only object; the failed trial is retained rather than relabeled as success."
+  },
+  "results": [
+    {
+      "seed": 42,
+      "status": "budget-exhausted",
+      "reason": "action-budget",
+      "goal": "2048-tile-16",
+      "outcome": {
+        "status": "running",
+        "metrics": {
+          "maxTile": 8,
+          "score": 24
+        }
+      },
+      "actions": 8,
+      "atomicInputs": 16,
+      "modelCalls": 8,
+      "retries": 0,
+      "failedAttempts": 0,
+      "visibleChangedActions": 8,
+      "noProgressActions": 0,
+      "durationMs": 55618,
+      "replay": {
+        "verified": true,
+        "steps": 16,
+        "reason": "all-inspected-checkpoints-match"
+      }
+    },
+    {
+      "seed": 7,
+      "status": "success",
+      "reason": "target-tile-reached",
+      "goal": "2048-tile-16",
+      "outcome": {
+        "status": "success",
+        "reason": "target-tile-reached",
+        "metrics": {
+          "maxTile": 16,
+          "score": 44
+        }
+      },
+      "actions": 8,
+      "atomicInputs": 16,
+      "modelCalls": 9,
+      "retries": 1,
+      "failedAttempts": 1,
+      "visibleChangedActions": 8,
+      "noProgressActions": 0,
+      "durationMs": 47701,
+      "replay": {
+        "verified": true,
+        "steps": 16,
+        "reason": "all-inspected-checkpoints-match"
+      }
+    }
+  ],
+  "automatedTests": {
+    "passed": 23,
+    "failed": 0,
+    "realModelRequired": false
+  }
+}

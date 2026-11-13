@@ -4,7 +4,7 @@ import { mkdtemp, writeFile, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createImageGuard } from '../src/dsh-image-guard.mjs';
-import { parseKeyDecision, runDshTurn, createDshTapPolicy } from '../src/dsh-policy.mjs';
+import { parseKeyDecision, parseActionDecision, runDshTurn, createDshTapPolicy, createDshActionPolicy } from '../src/dsh-policy.mjs';
 
 const keys = ['ArrowLeft', 'ArrowRight'];
 
@@ -12,6 +12,57 @@ test('model output is data: unsupported keys, executable text and extra fields a
   assert.equal(parseKeyDecision('{"key":"ArrowLeft"}', keys).key, 'ArrowLeft');
   assert.equal(parseKeyDecision('```json\n{"key":"ArrowRight","note":"右侧有空位"}\n```', keys).key, 'ArrowRight');
   for (const text of ['process.exit()', '{"key":"F12"}', '{"key":"ArrowLeft","code":"anything"}', 'null']) assert.throws(() => parseKeyDecision(text, keys));
+});
+
+test('action decisions keep facts, hypotheses and failed attempts bounded and separate', () => {
+  const controls = { keys, buttons: [], viewport: { width: 100, height: 100 } };
+  const parsed = parseActionDecision(JSON.stringify({ action: { type: 'hold', held: ['ArrowLeft'], ticks: 3 }, memory: { facts: ['A visible tile'], hypotheses: ['Left may be blocked'], failedAttempts: [] } }), controls);
+  assert.equal(parsed.memory.hypotheses[0], 'Left may be blocked');
+  assert.throws(() => parseActionDecision('{"action":{"type":"tap","key":"F12"}}', controls));
+  assert.throws(() => parseActionDecision(JSON.stringify({ action: { type: 'wait', ticks: 1 }, memory: { facts: ['x'.repeat(181)] } }), controls));
+});
+
+test('action policy retries invalid JSON, retains public feedback and memory, and honors model-call budget', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'glitchhunter-action-policy-'));
+  let calls = 0;
+  const controls = { keys, buttons: [], viewport: { width: 100, height: 100 } };
+  try {
+    const policy = await createDshActionPolicy({ directory: join(root, 'decisions'), controls, task: { description: 'Reach the visible target' }, maxModelCalls: 3, runTurn: async request => {
+      assert.equal('verification' in request, false);
+      calls++;
+      if (calls === 1) return { final: 'bad json', audit: [] };
+      if (calls === 2) {
+        assert.ok(request.prompt.includes('previous response was not executed'));
+        assert.ok(request.prompt.includes('Omit note and memory'));
+        return { final: JSON.stringify({ action: { type: 'tap', key: 'ArrowLeft' }, memory: { facts: ['Two tiles'], hypotheses: ['Try right next'], failedAttempts: [] } }), audit: [] };
+      }
+      assert.ok(request.prompt.includes('Try right next'));
+      assert.ok(request.prompt.includes('"visualChanged":false'));
+      assert.ok(!request.prompt.includes('PRIVATE_PROBE'));
+      return { final: '{"action":{"type":"tap","key":"ArrowRight"}}', audit: [] };
+    } });
+    const context = { observation: { image: { data: Buffer.from('image').toString('base64') } }, feedback: null, remaining: { steps: 10, ticks: 100, wallTimeMs: 5000 } };
+    assert.equal((await policy(context)).key, 'ArrowLeft');
+    assert.equal((await policy({ ...context, feedback: { status: 'executed', visualChanged: false, consecutiveNoProgress: 1 } })).key, 'ArrowRight');
+    assert.equal(await policy(context), null);
+    assert.equal(policy.stopReason(), 'model-call-budget');
+    assert.equal(policy.describe().modelCalls, 3);
+    assert.equal(policy.describe().decisions, 2);
+    assert.equal(policy.describe().retries, 1);
+    assert.equal(policy.describe().failedAttempts, 1);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test('exhausted model retries surface an error instead of returning a scripted fallback', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'glitchhunter-retry-error-'));
+  try {
+    const policy = await createDshActionPolicy({ directory: join(root, 'decisions'), controls: { keys, buttons: [], viewport: { width: 100, height: 100 } }, task: { description: 'Play' }, maxAttempts: 2, runTurn: async () => ({ final: '{"key":"F12"}', audit: [] }) });
+    await assert.rejects(policy({ observation: { image: { data: 'aW1hZ2U=' } }, remaining: { steps: 10, ticks: 100 } }), /failed after 2 attempts/);
+    assert.equal(policy.describe().decisions, 0);
+    assert.equal(policy.describe().modelCalls, 2);
+    const errorRecord = JSON.parse(await readFile(join(root, 'decisions', '0001.attempt-2.error.json'), 'utf8'));
+    assert.ok(errorRecord.message.includes('unsupported'));
+  } finally { await rm(root, { recursive: true, force: true }); }
 });
 
 test('Harness execution guard only admits the current screenshot with a bounded read count', async () => {
@@ -53,6 +104,11 @@ process.stdin.resume();
     await assert.rejects(runDshTurn({ binary: process.execPath, argsPrefix: [fake], patchPath: 'unused', screenshot, prompt: 'one move' }), /did not successfully inspect/);
     await writeFile(fake, 'setInterval(() => {}, 1000); process.stdin.resume();');
     await assert.rejects(runDshTurn({ binary: process.execPath, argsPrefix: [fake], patchPath: 'unused', screenshot, prompt: 'one move', timeoutMs: 30 }), /timed out/);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(new Error('episode-limit')), 30);
+    try {
+      await assert.rejects(runDshTurn({ binary: process.execPath, argsPrefix: [fake], patchPath: 'unused', screenshot, prompt: 'one move', signal: controller.signal }), /episode-limit/);
+    } finally { clearTimeout(timeout); }
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 

@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { BrowserAdapter } from '../src/browser.mjs';
 import { serveDirectory } from '../src/server.mjs';
-import { inspect2048 } from '../src/inspect-2048.mjs';
+import { inspect2048, observePublic2048, evaluate2048 } from '../src/inspect-2048.mjs';
 import { runEpisode, replayEpisode } from '../src/episode.mjs';
 
 test('real browser input, observation boundary, input release, seeded replay and divergence detection', { timeout: 60000 }, async () => {
@@ -45,6 +45,35 @@ test('real browser input, observation boundary, input release, seeded replay and
     const tiles = await adapter.page.locator('.tile-inner').evaluateAll(elements => elements.map(element => getComputedStyle(element).transform));
     assert.equal(tiles.length, 2);
     assert.ok(tiles.every(transform => transform !== 'matrix(0, 0, 0, 0, 0, 0)'));
+  } finally {
+    await adapter.close();
+    await server.close();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('real 2048 task success is independently verified with public HUD feedback and no hidden board in policy', { timeout: 30000 }, async () => {
+  const root = await mkdtemp(join(tmpdir(), 'glitchhunter-task-'));
+  const server = await serveDirectory(new URL('../third_party/2048', import.meta.url).pathname);
+  const adapter = new BrowserAdapter({ inspect: inspect2048, observePublic: observePublic2048 });
+  const config = { url: server.url, hz: 60, viewport: { width: 800, height: 900 }, keys: ['ArrowLeft'], buttons: [], seed: 42, seededHarness: true, screenshotAnimations: 'disabled' };
+  try {
+    const directory = join(root, 'success');
+    const summary = await runEpisode({ adapter, directory, config, evaluate: capture => evaluate2048(capture, 4), policy: async ({ observation, ...context }) => {
+      assert.deepEqual(Object.keys(observation.public).sort(), ['score', 'screen']);
+      assert.equal('progress' in context, false);
+      assert.equal('verification' in context, false);
+      return { type: 'tap', key: 'ArrowLeft' };
+    } });
+    assert.equal(summary.status, 'success');
+    assert.equal(summary.outcome.metrics.maxTile, 4);
+    assert.equal(summary.metrics.changedActions, 1);
+    assert.equal(summary.steps, 2);
+    assert.equal((await replayEpisode({ adapter, directory })).verified, true);
+    const heldDirectory = join(root, 'hold');
+    const held = await runEpisode({ adapter, directory: heldDirectory, config, maxActions: 1, policy: async () => ({ type: 'hold', held: ['ArrowLeft'], ticks: 6 }) });
+    assert.equal(held.cleanupSteps, 1);
+    assert.equal((await replayEpisode({ adapter, directory: heldDirectory })).verified, true);
   } finally {
     await adapter.close();
     await server.close();

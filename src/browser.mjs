@@ -3,9 +3,10 @@ import { validateInput } from './input.mjs';
 
 /** Trusted host-side adapter. The policy receives observations, never this object. */
 export class BrowserAdapter {
-  constructor({ executablePath = process.env.CHROMIUM_PATH, inspect = null, headless = true } = {}) {
+  constructor({ executablePath = process.env.CHROMIUM_PATH, inspect = null, observePublic = null, headless = true } = {}) {
     this.options = { executablePath, headless };
     this.inspect = inspect;
+    this.observePublic = observePublic;
     this.held = new Set();
     this.buttons = new Set();
   }
@@ -53,13 +54,11 @@ export class BrowserAdapter {
     const input = validateInput(value, this.controls);
     const wantedKeys = new Set(input.held);
     const wantedButtons = new Set(input.buttons);
-    for (const key of this.held) if (!wantedKeys.has(key)) await this.page.keyboard.up(key);
-    for (const button of this.buttons) if (!wantedButtons.has(button)) await this.page.mouse.up({ button });
+    for (const key of [...this.held]) if (!wantedKeys.has(key)) { await this.page.keyboard.up(key); this.held.delete(key); }
+    for (const button of [...this.buttons]) if (!wantedButtons.has(button)) { await this.page.mouse.up({ button }); this.buttons.delete(button); }
     if (input.pointer) await this.page.mouse.move(input.pointer.x, input.pointer.y);
-    for (const key of wantedKeys) if (!this.held.has(key)) await this.page.keyboard.down(key);
-    for (const button of wantedButtons) if (!this.buttons.has(button)) await this.page.mouse.down({ button });
-    this.held = wantedKeys;
-    this.buttons = wantedButtons;
+    for (const key of wantedKeys) if (!this.held.has(key)) { await this.page.keyboard.down(key); this.held.add(key); }
+    for (const button of wantedButtons) if (!this.buttons.has(button)) { await this.page.mouse.down({ button }); this.buttons.add(button); }
     // ticks are harness time slices, not a guarantee of engine physics steps.
     const startMs = Math.floor(this.tick * 1000 / this.config.hz);
     this.tick += input.ticks;
@@ -71,17 +70,29 @@ export class BrowserAdapter {
   async capture() {
     const image = await this.page.screenshot({ type: 'png', animations: this.config.screenshotAnimations ?? 'allow', timeout: 10000 });
     const state = this.inspect ? await this.inspect(this.page) : null;
+    const visible = this.observePublic ? await this.observePublic(this.page) : null;
     return {
       observation: {
         tick: this.tick,
         viewport: structuredClone(this.config.viewport),
         held: [...this.held],
         buttons: [...this.buttons],
+        ...(visible ? { public: visible.public } : {}),
         image: { mimeType: 'image/png', data: image.toString('base64') }
       },
-      verification: { available: Boolean(this.inspect), state, errors: structuredClone(this.errors) }
+      verification: { available: Boolean(this.inspect), state, errors: structuredClone(this.errors) },
+      progress: visible ? { key: visible.progressKey, source: 'visible-game-ui' } : null
     };
   }
+
+  // 结束时仅释放输入，不推进模拟时间；仍由运行器记录供重放。
+  async releaseAll() {
+    for (const key of [...this.held]) { await this.page.keyboard.up(key); this.held.delete(key); }
+    for (const button of [...this.buttons]) { await this.page.mouse.up({ button }); this.buttons.delete(button); }
+    return this.capture();
+  }
+
+  inputState() { return { held: [...this.held], buttons: [...this.buttons] }; }
 
   async describe() {
     return { driver: 'playwright', browser: this.browser.version(), clock: 'browser-virtual-time', screenshotAnimations: this.config.screenshotAnimations ?? 'allow', physicsStepGuaranteed: false, randomControl: this.config.seededHarness ? 'Math.random test override' : 'uncontrolled' };

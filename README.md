@@ -3,7 +3,7 @@
 单个 Agent 游玩与测试游戏的基础设施原型。
 目标是通过玩家输入探索漏洞，并保留可核对的复现证据。
 
-**当前状态**：浏览器输入、截图观察、隔离重置、时钟推进、录制与状态探针重放；已接入电脑上安装的 DeepSeek Harness，让单个模型根据截图选择按键。
+**当前状态**：单 Agent 截图决策、通用玩家动作、公开反馈与短期记忆、任务判定、限次重试、运行预算，以及操作记录与状态探针重放。
 `npm run demo` 仍是脚本基线；`npm run play:deepseek` 才会调用模型。尚未实现 Godot 驱动、Fuzz 引擎和步骤缩减。
 
 ## 运行
@@ -44,24 +44,29 @@ Harness 安装在本机，推理使用该账号的远端模型服务，不是 Ol
 
 ```sh
 CHROMIUM_PATH=/usr/bin/chromium npm run play:deepseek
-# 默认 4 次模型决策；每次点击展开成按下和松开两段记录。
-CHROMIUM_PATH=/usr/bin/chromium GLITCHHUNTER_MOVES=6 npm run play:deepseek
+# 默认目标为构造 32 方块，最多 12 个高层动作、180 秒。
+CHROMIUM_PATH=/usr/bin/chromium GLITCHHUNTER_SEEDS=42,7 GLITCHHUNTER_TARGET_TILE=16 GLITCHHUNTER_MOVES=8 npm run play:deepseek
 ```
 
 可设置 `DSH_BINARY`、`DSH_PLAYER_PROVIDER`、`DSH_PLAYER_MODEL`、`DSH_PLAYER_EFFORT`。
 使用 `dsh --profile headless --patch ... --json`，启动时覆盖认证、模型和工具选择；不修改 Web profile 或复制登录凭据。
 正常运行会由 Harness 生成其自身的会话与附件记录，并重写其 headless 空根配置，遵循所安装版本的标准启动流程。
 
-模型每次只获当前截图、按键说明、最近最多六次选择和公开执行反馈。
-必须成功读取当前截图，才接受它返回的 JSON 按键。工具执行守卫只放行当前图片；执行器检查按键后完成短按及松开。
-内部状态探针仍仅用于重放核验。每次决策有 90 秒超时，失败结束本轮，不悄悄换成脚本。
-首版每次决策启动一个新的 headless 会话，支持短历史，但尚未实现持久 SDK 连接与长程规划。
+模型每次获得当前截图、按键说明、公开分数/界面状态、最近最多六次动作及结果，以及自报的事实/假设/失败尝试短记忆。
+必须成功读取当前截图，才接受其 JSON 动作。执行器将短按、保持、松开或等待展开为原子输入。
+内部探针仅由独立任务检查与重放使用。单次模型调用默认 60 秒，决策最多两次尝试，格式修复失败后保存错误并结束。
+宿主区分成功、游戏失败、停滞、预算耗尽和执行错误；模型主动停止不等于任务成功。
+每次决策仍启动新的 headless 会话，尚未实现持久 SDK 连接和长程规划。
+
+任务与预算可设置 `GLITCHHUNTER_TARGET_TILE`、`GLITCHHUNTER_SEED` 或 `GLITCHHUNTER_SEEDS`、`GLITCHHUNTER_MOVES`、`GLITCHHUNTER_MODEL_CALLS`、`GLITCHHUNTER_SECONDS`，详见 [M1 运行接口](docs/agent-loop.zh-CN.md)。
+其中 `GLITCHHUNTER_MODEL_CALLS` 限制 Harness 决策尝试数，不是底层 API 请求数或 token 预算。
 
 输出为 `runs/deepseek-*/`：
 
-- `decisions/`：模型实际看的图片、按键决定和只含操作事件的审计，不复制推理流或凭据。
-- `episode/`：展开后的完整按键序列、截图与内部核验检查点。
-- `result.json`：模型选择、动作数和重放结果；失败时保存 `failure.json`。
+- `seed-*/decisions/`：实际截图、模型动作、重试错误和操作事件审计，不复制推理流或凭据。
+- `seed-*/episode/`：原子输入、截图、内部检查点、公开反馈事件和运行摘要。
+- `seed-*/result.json`：本轮结束状态、指标和重放结果。
+- `batch.json`：本次请求的种子、任务与每轮结果。
 
 2048 模式显式设置 `screenshotAnimations: disabled`，在截图时完成有限 CSS 动画，避免入场动画使棋盘暂时空白。
 已检查该示例的游戏脚本不依赖 animationend/transitionend。此配置记录在轨迹中；普通适配器默认仍允许动画。
@@ -72,17 +77,18 @@ CHROMIUM_PATH=/usr/bin/chromium GLITCHHUNTER_MOVES=6 npm run play:deepseek
 src/episode.mjs 的 runEpisode 接受一个异步 policy 函数，输入是截图、公开反馈和剩余预算，输出例如：
 
 ```json
-{"held":["ArrowRight"],"buttons":[],"ticks":12}
+{"type":"tap","key":"ArrowRight"}
 ```
 
-下一次传入 `held: []` 会松开按键。持续 held 不会自动重复 keydown。
-传入 null 结束本轮。Harness 连接位于 policy 边界，内部检查器数据不发送给模型。
+仍兼容 `{"held":["ArrowRight"],"ticks":12}` 原子输入。高层动作的展开、预算和清理语义见 [接口说明](docs/agent-loop.zh-CN.md)。
+传入 null 结束策略；任务成功由独立 evaluate 回调判定。Harness 连接位于 policy 边界，内部检查器数据不发送给模型。
 
 ## 设计
 
 - [项目进度与实测记录](docs/progress.zh-CN.md)
 - [后续工作计划与验收标准](ROADMAP.md)
 - [架构与实现边界](docs/architecture.zh-CN.md)
+- [M1 动作、预算、状态和反馈接口](docs/agent-loop.zh-CN.md)
 - [开源游戏选型与 Rest-in-Pieces 核查](docs/games.zh-CN.md)
 - [版本变化](CHANGELOG.md)
 

@@ -1,15 +1,19 @@
 {
   "name": "glitchhunter",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "license": "MIT",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "test": "node --test test/*.test.mjs",
     "demo": "node scripts/demo.mjs",
     "play:deepseek": "node scripts/play-deepseek.mjs",
     "serve": "node scripts/serve.mjs"
   },
-  "dependencies": { "playwright": "1.65.0" }
+  "dependencies": {
+    "playwright": "1.65.0"
+  }
 }
